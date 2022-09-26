@@ -1,6 +1,6 @@
 const sqlite3 = require('sqlite3')
 const db = new sqlite3.Database('memos.db')
-const { Select } = require('enquirer')
+const enquirer = require('enquirer')
 const commander = require('commander')
 
 commander
@@ -19,21 +19,18 @@ class Memo {
   }
 }
 
+const createTableSQL = 'CREATE TABLE IF NOT EXISTS memos (id integer primary key autoincrement, title text, content text)'
+
 class Database {
   static getMemos () {
     return new Promise((resolve, reject) => {
       db.serialize(() => {
-        db.run('CREATE TABLE IF NOT EXISTS memos (id integer primary key autoincrement, title text, content text)')
+        db.run(createTableSQL)
         db.all('SELECT * FROM memos', function (err, rows) {
           if (err) {
             reject(err)
           }
-          const memos = []
-          rows.forEach(function (row) {
-            const memo = new Memo(row.id, row.title, row.content)
-            memos.push(memo)
-          })
-          resolve(memos)
+          resolve(rows.map((row) => new Memo(row.id, row.title, row.content)))
         })
       })
     })
@@ -42,7 +39,7 @@ class Database {
   static getTitles () {
     return new Promise((resolve, reject) => {
       db.serialize(() => {
-        db.run('CREATE TABLE IF NOT EXISTS memos (id integer primary key autoincrement, title text, content text)')
+        db.run(createTableSQL)
         db.all('SELECT title FROM memos', function (err, rows) {
           if (err) {
             reject(err)
@@ -59,7 +56,7 @@ class Database {
 
   static deleteMemo (id) {
     db.serialize(() => {
-      db.run('CREATE TABLE IF NOT EXISTS memos (id integer primary key autoincrement, title text, content text)')
+      db.run(createTableSQL)
       db.run(`DELETE FROM memos WHERE id = ${id}`, err => {
         if (err) {
           return console.error(err.message)
@@ -72,90 +69,96 @@ class Database {
     let joinedLines = []
     joinedLines = lines.join('\n')
     db.serialize(() => {
-      db.run('CREATE TABLE IF NOT EXISTS memos (id integer primary key autoincrement, title text, content text)')
+      db.run(createTableSQL)
       db.run('insert into memos(title,content) values(?,?)', lines[0], joinedLines)
     })
   }
 }
 
-function main () {
-  if (options.read) {
-    readOption()
-  } else if (options.list) {
-    listOption()
-  } else if (options.delete) {
-    deleteOption()
-  } else {
-    process.stdin.resume()
-    process.stdin.setEncoding('utf8')
+class MemoCommand {
+  static main () {
+    if (options.read) {
+      MemoCommand.#readOption()
+    } else if (options.list) {
+      MemoCommand.#listOption()
+    } else if (options.delete) {
+      MemoCommand.#deleteOption()
+    } else {
+      process.stdin.resume()
+      process.stdin.setEncoding('utf8')
 
-    const lines = []
-    const reader = require('readline').createInterface({
-      input: process.stdin,
-      output: process.stdout
-    })
+      const lines = []
+      const reader = require('readline').createInterface({
+        input: process.stdin,
+        output: process.stdout
+      })
 
-    reader.on('line', (line) => {
-      lines.push(line)
-    })
+      reader.on('line', (line) => {
+        lines.push(line)
+      })
 
-    reader.on('close', () => {
-      Database.createMemo(lines)
-    })
+      reader.on('close', () => {
+        Database.createMemo(lines)
+      })
+    }
+  }
+
+  static async #listOption () {
+    const titles = await Database.getTitles()
+    if (titles.length === 0) {
+      MemoCommand.#noData()
+    } else {
+      titles.forEach(function (title) {
+        console.log(title)
+      })
+    }
+  }
+
+  static async #readOption () {
+    const memos = await Database.getMemos()
+    if (memos.length === 0) {
+      MemoCommand.#noData()
+    } else {
+      (async () => {
+        const question = {
+          type: 'select',
+          name: 'read',
+          message: 'Choose a note you want to see:',
+          choices: memos,
+          result (titles) {
+            return this.focused.content
+          }
+        }
+        const answer = await enquirer.prompt(question)
+        console.log(answer.read)
+      })()
+    }
+  }
+
+  static async #deleteOption () {
+    const memos = await Database.getMemos()
+    if (memos.length === 0) {
+      MemoCommand.#noData()
+    } else {
+      (async () => {
+        const question = {
+          type: 'select',
+          name: 'delete',
+          message: 'Choose a note you want to delete:',
+          choices: memos,
+          result (titles) {
+            return this.focused.id
+          }
+        }
+        const answer = await enquirer.prompt(question)
+        Database.deleteMemo(answer.delete)
+      })()
+    }
+  }
+
+  static #noData () {
+    console.log('There is no note. please add a note.')
   }
 }
 
-async function listOption () {
-  const titles = await Database.getTitles()
-  if (titles.length === 0) {
-    noData()
-  } else {
-    titles.forEach(function (title) {
-      console.log(title)
-    })
-  }
-}
-
-async function readOption () {
-  const memos = await Database.getMemos()
-  if (memos.length === 0) {
-    noData()
-  } else {
-    const prompt = new Select({
-      name: 'read',
-      message: 'Choose a note you want to see:',
-      choices: memos,
-      result (titles) {
-        return this.focused.content
-      }
-    })
-    prompt.run()
-      .then(answer => console.log(answer))
-      .catch(console.error)
-  }
-}
-
-async function deleteOption () {
-  const memos = await Database.getMemos()
-  if (memos.length === 0) {
-    noData()
-  } else {
-    const prompt = new Select({
-      name: 'delete',
-      message: 'Choose a note you want to delete:',
-      choices: memos,
-      result (titles) {
-        return this.focused.id
-      }
-    })
-    prompt.run()
-      .then(answer => Database.deleteMemo(answer))
-      .catch(console.error)
-  }
-}
-
-function noData () {
-  console.log('There is no note. plese add a note.')
-}
-
-main()
+MemoCommand.main()
