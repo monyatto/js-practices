@@ -2,6 +2,7 @@ const sqlite3 = require('sqlite3')
 const db = new sqlite3.Database('memos.db')
 const enquirer = require('enquirer')
 const commander = require('commander')
+let reader = require('readline')
 
 commander
   .option('-l, --list', 'list memos')
@@ -19,13 +20,13 @@ class Memo {
   }
 }
 
-const createTableSQL = 'CREATE TABLE IF NOT EXISTS memos (id integer primary key autoincrement, title text, content text)'
+const CREATE_TABLE_SQL = 'CREATE TABLE IF NOT EXISTS memos (id integer primary key autoincrement, title text, content text)'
 
 class Database {
   static getMemos () {
     return new Promise((resolve, reject) => {
       db.serialize(() => {
-        db.run(createTableSQL)
+        db.run(CREATE_TABLE_SQL)
         db.all('SELECT * FROM memos', function (err, rows) {
           if (err) {
             reject(err)
@@ -39,7 +40,7 @@ class Database {
   static getTitles () {
     return new Promise((resolve, reject) => {
       db.serialize(() => {
-        db.run(createTableSQL)
+        db.run(CREATE_TABLE_SQL)
         db.all('SELECT title FROM memos', function (err, rows) {
           if (err) {
             reject(err)
@@ -56,7 +57,7 @@ class Database {
 
   static deleteMemo (id) {
     db.serialize(() => {
-      db.run(createTableSQL)
+      db.run(CREATE_TABLE_SQL)
       db.run(`DELETE FROM memos WHERE id = ${id}`, err => {
         if (err) {
           return console.error(err.message)
@@ -69,7 +70,7 @@ class Database {
     let joinedLines = []
     joinedLines = lines.join('\n')
     db.serialize(() => {
-      db.run(createTableSQL)
+      db.run(CREATE_TABLE_SQL)
       db.run('insert into memos(title,content) values(?,?)', lines[0], joinedLines)
     })
   }
@@ -88,7 +89,7 @@ class MemoCommand {
       process.stdin.setEncoding('utf8')
 
       const lines = []
-      const reader = require('readline').createInterface({
+      reader = reader.createInterface({
         input: process.stdin,
         output: process.stdout
       })
