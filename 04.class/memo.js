@@ -120,19 +120,17 @@ class MemoCommand {
     if (memos.length === 0) {
       MemoCommand.#noData()
     } else {
-      (async () => {
-        const question = {
-          type: 'select',
-          name: 'read',
-          message: 'Choose a note you want to see:',
-          choices: memos,
-          result (titles) {
-            return this.focused.content
-          }
+      const question = {
+        type: 'select',
+        name: 'read',
+        message: 'Choose a note you want to see:',
+        choices: memos,
+        result (titles) {
+          return this.focused.content
         }
-        const answer = await enquirer.prompt(question)
-        console.log(answer.read)
-      })()
+      }
+      const answer = await enquirer.prompt(question)
+      console.log(answer.read)
     }
   }
 
@@ -141,19 +139,17 @@ class MemoCommand {
     if (memos.length === 0) {
       MemoCommand.#noData()
     } else {
-      (async () => {
-        const question = {
-          type: 'select',
-          name: 'delete',
-          message: 'Choose a note you want to delete:',
-          choices: memos,
-          result (titles) {
-            return this.focused.id
-          }
+      const question = {
+        type: 'select',
+        name: 'delete',
+        message: 'Choose a note you want to delete:',
+        choices: memos,
+        result (titles) {
+          return this.focused.id
         }
-        const answer = await enquirer.prompt(question)
-        Database.deleteMemo(answer.delete)
-      })()
+      }
+      const answer = await enquirer.prompt(question)
+      Database.deleteMemo(answer.delete)
     }
   }
 
